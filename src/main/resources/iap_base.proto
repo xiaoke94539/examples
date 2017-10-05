@@ -1,0 +1,18 @@
+//File: iap_base.proto
+//Contains structures used by all IAP protobuf schema files
+package acp.iap;
+option java_package = "com.aruba.acp.device.iap";
+option java_outer_classname = "IapBase";
+
+message IpAddress {
+        enum addr_family {
+             ADDR_FAMILY_INET = 2;   // Internet IP Protocol
+             ADDR_FAMILY_INET6 = 10; // IP version 6
+        }
+        required addr_family af = 1;
+        required bytes addr = 2;
+}
+
+message MacAddress {
+        required bytes addr = 1;
+}

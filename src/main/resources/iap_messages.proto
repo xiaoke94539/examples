@@ -1,0 +1,254 @@
+package acp.iap;
+option java_package = "com.aruba.acp.device.iap";
+option java_outer_classname = "Iap_messages";
+
+//File: iap_messages.proto
+import "iap_base.proto";
+import "iap_management_messages.proto";
+import "iap.proto";
+
+// Common info across all message types
+message IapMessageInfo {
+    optional uint32 version = 1; //version of iap request message.
+    optional uint64 sequence = 3; //If this message is the response to a central message, then sequence number should match that in the central message
+    optional bytes guid = 4; //X-Guid, for iap, it's vc key for now.
+    optional string oem_tag = 5; //X-OEM-Tag, currently it's Aruba, for third party, it's oem bytes.
+}
+
+//The following topics refer to IAP-generated message which contains management state of the cluster.
+//   "iap.state.sync"
+//   "iap.state.add"
+//   "iap.state.update"
+//   "iap.state.delete"
+//The message will have the following payload in DeviceEnvelope:
+message IapState {
+    optional IapMessageInfo info = 1; //Common info across all message types
+    optional ClusterInfo cluster = 2;
+    repeated WlanInfo wlan = 3;
+    repeated ApInfo ap = 4;
+    repeated ClientInfo client = 5;
+    repeated VpnTunnelInfo vpn_tunnel = 6;
+    repeated DynamicBlackedClientsInfo DynamicBlackedClients = 7;
+}
+
+//The topic "iap.stat" refer to IAP-generated message which contains management statistics of the cluster.
+//The message will have the following payload inside DeviceEnvelope:
+message IapStat {
+    optional IapMessageInfo info = 1; //Common info across all message types
+    repeated RadioStat radio_stat = 2;
+    repeated VapStat vap_stat = 3;
+    repeated PortStat port_stat = 4;
+    repeated ClientStat client_stat = 5;
+    repeated AirMonitorInfo air_monitor = 6;
+    repeated SpectrumInfo spectrum = 7;
+    repeated AirMonitorActiveLaserBeamInfo air_monitor_alb = 8;
+    repeated TunnelStat tunnel = 9;
+    optional ModemStat modem_stat = 10;	// not yet added
+}
+
+//The topic "iap.trap" refer to an IAP-generated message which contains management traps of the cluster.
+//The message will have the following payload inside DeviceEnvelope:
+message IapTrap
+{
+    optional IapMessageInfo info = 1; //Common info across all message types
+    repeated IapTrapEntry trap_entry = 2;
+}
+
+//The following topics refer to IAP-generated messages with pure binary payloads inside DeviceEnvelope, which is sent from iap to central:
+//    "iap.config.response"  --- reponse current running configuration of the cluster to central for topic "iap.config.audit" and "iap.config.delta".
+message IapConfigResp
+{
+    optional IapMessageInfo info = 1;//Common info across all message types
+    optional bytes config = 2; //config will be CLI commands representing the current running configuration of the cluster
+    optional ConfigRespStatus response_status = 3;//this field will attend only when response for iap.config.delta.
+    optional uint32 checksum = 4; //this field is required by Central side to identify configuration change or not.
+}
+
+//    "iap.debug.result"  --- Payload will be CLI debug command output
+
+
+//The following topics refer to central-generated messages with pure binary payloads inside DeviceEnvelope, which is sent from central to iap:
+//    "iap.config.audit"                         --- No or empty payload, iap will send iap.config response message to central.
+//    "iap.config.delta"                         --- Payload will be CLI onfig, iap will send iap.config reponse message to central if delta is non-
+//    "iap.cmd.action"                           --- Payload will be CLI action command
+//    "iap.cmd.debug"                            --- Payload will be CLI debug command, iap will send iap.debug.result message to central.
+//    "iap.firmware.sync"                        --- Payload will be image file URL
+//    "iap.firmware.upgrade"                     --- Payload will be image file URL
+//    "iap.firmware.upgrade.multiclass"          --- Payload will be multiclass URL
+//    "iap.firmware.upgrade.multiclass.noreboot" --- Payload will be multiclass URL
+//    "iap.get.stat"                             --- No or empty payload, iap will send iap.stat message to central.
+//    "iap.get.state"                            --- No or empty payload, iap will send iap.state.sync message to central.
+//    "iap.reboot.all"                           --- No or empty payload
+//    "iap.cert.install"                         --- Payload will be certificate file
+//    "iap.cert.uninstall"                       --- No or empty payload
+//    "iap.cplogo.install"                       --- Payload will be captive portal logo file
+//    "iap.cplogo.uninstall"                     --- No or empty payload
+
+message IapCmdReq
+{
+    optional IapMessageInfo info = 1;//Common info across all message types
+    optional bytes payload = 2;
+}
+
+
+//The topic "iap.apprf" refer to an IAP-generated message which contains AppRF data.
+//The message will have the following payload inside DeviceEnvelope
+message IapAppRF
+{
+    optional IapMessageInfo info = 1; //Common info across all message types
+    required uint64 timestamp = 2;
+    optional MacAddress ap_mac = 3;
+    repeated AppDetailRecord record = 4;
+}
+
+message AppDetailRecord
+{
+    enum IapAppEnforcementStatus
+    {
+        ENF_PERMIT = 1;
+        ENF_DENY = 2;
+    }
+    optional IpAddress client_ip = 1;
+    optional uint32 app_id = 2;
+    optional uint32 web_id = 3;
+    optional uint32 web_rep = 4;
+    optional IapAppEnforcementStatus session_flags = 5; 
+    optional uint32 tx_bytes = 6; //since the last bytes sent to central
+    optional uint32 rx_bytes = 7;
+    optional IpAddress dest_ip = 8;
+}
+
+//The topic "iap.rssi" refer to an IAP-generated message which contains AppRF data.
+//The message will have the following payload inside DeviceEnvelope
+message IapRssi
+{
+    optional IapMessageInfo info = 1; //Common info across all message types
+    required uint64 timestamp = 2;
+    optional MacAddress ap_mac = 3;
+    repeated rssi rssi = 4;
+}
+
+//The following topics refer to messages between the IAP and the cloud which contains client AAA data.
+//    "iap.client.aaa"
+//    "guest.client.aaa"
+//The message will have the following payload inside DeviceEnvelope
+message ClientAAA {
+    optional IapMessageInfo info = 1; //Common info across all message types
+    optional bytes payload = 2;       //Most likely a RADIUS packet
+}
+
+// Topic: "iap.cmd.debug.req"
+// This message will be sent by Athena to IAP to run some debug/troubleshooting
+// commmands on the IAP. More than one commands can be bunched together and sent
+// to IAP within a single message, to reduce overhead and network traffic
+message IapDebugCommand {
+    optional string cmd = 1;
+}
+message IapDebugCommandListReq {
+    optional IapMessageInfo info = 1;
+    repeated IapDebugCommand command = 2;
+}
+
+// Topic: "iap.cmd.debug.resp"
+// This message will be sent by IAP to Athena in response to some 
+// debug/troubleshooting commmands run on IAP. More than one command responses
+// can be bunched together and sent to Athena within a single message to reduce
+// overhead and network traffic
+message IapDebugCommandResp {
+    optional string cmd = 1;
+    optional string cmd_resp = 2;
+}
+message IapDebugCommandListResp {
+    optional IapMessageInfo info = 1;
+    repeated IapDebugCommandResp command_resp = 2;
+}
+
+//Topic iap.cert.get, this response message is the envelope into data in message IapCmdResp.
+message IapCmdCertResp
+{
+    optional string certificate=1;  // value will be subject field of certificate 
+}
+
+//Topic iap.cplogo.get, this response message is the envelope into data in message IapCmdResp.
+message IapCmdCplogoResp
+{
+    optional bytes cplogo_info=1; // not sure about the response 
+}
+
+message IapCmdResp
+{
+    enum IapCmdRespStatus
+    {
+        CMD_OK = 1;
+        CMD_FAIL = 2;
+    }
+    optional IapMessageInfo info = 1;
+    optional IapCmdRespStatus cmd_resp_status = 2;
+    optional bytes data = 3; //If topic is iap.cert.install then it is IapCmdCertResp. If topic is iap.cplog.install then it is iapCmdCplogoResp.
+}
+
+//topic iap.firmware.upgrade.status send from iap to central to report the status of firmware upgrade.
+//IapFirmwareUpgradeStatus message is under device envelope message.
+//master send this topic when iap upgrade firmware from central.
+message IapFirmwareUpgradeStatus
+{
+    enum FirmwareUpgradeStatus
+    {
+        DOWNLOADING_IMAGE = 1;
+        UPGRADING_IMAGE = 2;
+        UPGRAD_SUCCESS = 3;  //for upgrade non-reboot command.
+        UPGRAD_SUCCESS_AND_REBOOTING_AP = 4; //for upgrade reboot command.
+        UPGRADING_IN_PROCESS = 5; //error message ---- one upgrade already in process.
+        INVALID_URL_FORMAT = 6;        
+        DOWNLOAD_IMAGE_FAIL = 7;       
+        UPGRADE_IMAGE_FAIL = 8; 
+    }
+    optional IapMessageInfo info = 1;
+    optional FirmwareUpgradeStatus status = 2;
+}
+
+// auto join related messages.
+message IapSlaveSerialNumber {
+    optional string serial = 1;
+}
+
+//auto join request message. topic is "iap.slave.autojoin.req"
+message IapSlaveAutoJoinReq {
+    optional IapMessageInfo info = 1; //Common info across all message types
+    repeated IapSlaveSerialNumber slave = 2;
+}
+
+message IapSlaveAutoJoinStatus {
+    enum EIapSlaveAutoJoinStatus
+    {  
+        AUTHORIZED = 1; //Allow slave to auto-join
+        NOT_AUTHORIZED = 2; //Do not allow slave to auto-join
+    }
+    optional string serial = 1;
+    optional IapSlaveAutoJoinStatus autojoin_status = 2;
+}
+
+//auto join response message. topic is "iap.slave.autojoin.res"
+message IapSlaveAutoJoinRes {             
+    optional IapMessageInfo info = 1; //Common info across all message types
+    repeated IapSlaveAutoJoinStatus slave = 2;
+}
+
+//The topic "iap.clienturl" refer to an IAP-generated message which contains client URL data.
+//The message will have the following payload inside DeviceEnvelope
+message IapClientURL
+{
+    optional IapMessageInfo info = 1; //Common info across all message types
+    required uint64 timestamp = 2;
+    optional MacAddress ap_mac = 3;
+    repeated URLDetailRecord url_record = 4;
+}
+
+message URLDetailRecord
+{
+    optional IpAddress client_ip = 1;
+    optional IpAddress dest_ip = 2;
+    optional bytes url = 3;
+    optional uint32 hit_count = 4;
+}
+

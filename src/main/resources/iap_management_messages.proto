@@ -1,0 +1,388 @@
+//File: iap_management_messages.proto
+//Contains structures used by iap_messages.proto
+package acp.iap;
+option java_package = "com.aruba.acp.device.iap";
+option java_outer_classname = "Iap_management_messages";
+
+//File: iap_management_messages.proto
+//Contains structures used by iap_messages.proto
+
+import "iap_base.proto";
+
+//config fail reason message
+message ConfigCmdStatus
+{
+    optional string config_command_profile = 1; //for profile based.
+    optional string config_command = 2;
+    optional string config_command_status = 3;
+}
+
+//config response status message
+message ConfigRespStatus
+{
+    enum ConfigStatus
+    {
+        CONFIG_OK = 0;
+        CONFIG_FAIL = 1; //the whole delta configure failed for some IAP reason (such as IAP busy)
+        CONFIG_CMD_FAIL = 2; //the part of configure failed, server side should re-transmit the failed command to IAP again.
+    }
+    optional ConfigStatus status = 1; //if CONFIG_FAIL, fail field will contain fail reason for each command.
+    optional string config_fail_reason = 2; //the field avalible when status is CONFIG_FAIL
+    repeated ConfigCmdStatus config_cmd_status = 3;
+}
+
+enum wlan_opmode_bitmap {
+    WIFI_ENCRYPTION_DISABLED_BIT = 0;
+    WIFI_ENCRYPTION_STATIC_WEP_BIT = 1;
+    WIFI_ENCRYPTION_DYNAMIC_WEP_BIT = 2;
+    WIFI_ENCRYPTION_STATIC_TKIP_BIT = 3;
+    WIFI_ENCRYPTION_DYNAMIC_TKIP_BIT = 4;
+    WIFI_ENCRYPTION_WPA2_PSK_BIT = 5;
+    WIFI_ENCRYPTION_WPA2_8021X_BIT = 6;
+    WIFI_ENCRYPTION_WPA2_PREAUTH_BIT = 7;
+    WIFI_ENCRYPTION_XSEC_BIT = 8;
+    WIFI_ENCRYPTION_WPA_AES_PSK_BIT = 9;
+    WIFI_ENCRYPTION_WPA_AES_8021X_BIT = 10;
+    WIFI_ENCRYPTION_WPA2_TKIP_PSK_BIT = 11;
+    WIFI_ENCRYPTION_WPA2_TKIP_8021X_BIT = 12;
+    WIFI_ENCRYPTION_WPA2_AES_GCM_128_BIT = 13;
+    WIFI_ENCRYPTION_WPA2_AES_GCM_256_BIT = 14;
+    WIFI_ENCRYPTION_WPA2_AES_128_CMAC_BIT = 15;
+}
+
+//Cluster information
+message ClusterInfo {
+    optional string vc_key = 1; 
+    optional string vc_name = 2; 
+    optional string organization = 3; 
+    optional IpAddress vc_ip = 4;
+    optional string image_version = 5;
+    optional string oem = 6;
+    optional string single_signon_key = 7;
+    optional string cert_sn_server = 8;
+    optional string cert_sn_ca = 9;
+    optional bytes config_rcv = 10;
+    optional string upgrade_state = 11;
+    optional string facebook_id = 12;
+    optional IpAddress master_ip = 13;
+    optional IpAddress master_ip_mask = 14;
+    optional IpAddress master_gateway_ip = 15;
+    optional IpAddress master_nameserver_ip = 16;
+}
+
+//WLAN information
+message WlanInfo {
+    optional bytes essid = 1;
+    optional uint32 bssid_index = 2;
+    optional uint32 wlan_index = 7;
+    optional string vlan = 3;
+    optional uint32 op_mode = 4;
+    optional uint32 wlan_type = 5;
+    optional uint32 band = 6;
+}
+
+//RSSI information
+message RssiInfo {
+    optional MacAddress sta_mac = 1;
+    optional uint32 snr = 2;
+}
+
+//VAP information
+message VapInfo
+{
+    optional MacAddress bssid = 1;
+    optional bytes essid = 2;
+}
+
+//Radio information
+message RadioInfo {
+    optional MacAddress radio_mac = 1;
+    optional string channel = 2;
+    optional uint32 transmit_power = 3;
+    optional uint32 radio_num = 4;
+    optional uint32 radio_band = 5;
+    optional uint32 noise_floor = 6;
+    optional uint32 channel_busy_64 = 7;
+    optional uint32 tx_drops = 8;
+    repeated RssiInfo rssi = 9; //include only clients rssi.
+    repeated VapInfo vap = 10;
+}
+
+//Port information
+message PortInfo
+{
+    optional uint32 interface_index = 1;
+    optional MacAddress eth_mac = 2;
+    optional uint32 operate_state = 3;
+    optional uint32 port_type = 4;
+    optional uint32 port_mode = 5;
+    optional uint32 admin_state = 6;
+    optional uint32 interface_speed = 7;
+    optional uint32 port_duplex = 8;
+}
+
+//AP information
+message ApInfo {
+    optional MacAddress ap_mac = 1;
+    optional string serial_number = 2;
+    optional string ap_name = 3;
+    optional string model = 4;
+    optional string mode = 5; 
+    optional IpAddress ap_ip = 6;
+    optional uint32 cpu_usage = 7; 
+    optional uint32 memory_total = 8; 
+    optional uint32 memory_free = 9; 
+    optional uint32 is_master = 10; 
+    optional uint32 uptime = 11; 
+    optional uint32 mesh_mode = 12; 
+    optional uint32 led_status = 13; 
+    optional uint32 ext_ssid_state = 16; 
+    repeated RadioInfo radio = 14;
+    repeated PortInfo port = 15;
+    optional string service_tag = 17; 
+    optional uint32 modem_status = 18; 
+    optional uint32 modem_simpin_status = 19; 
+    optional uint32 current_uplink_inuse = 20; 
+}
+
+//ClientInfo
+message ClientInfo {
+    required uint32 is_wired = 1;
+    optional MacAddress client_mac = 2;
+    optional string client_name = 3;
+    optional IpAddress client_ip = 4;
+    optional uint32 phy_type = 5;
+    optional uint32 ht_type = 6;
+    optional MacAddress bssid = 7;
+    optional uint32 snr = 8;
+    optional uint32 rx_retries = 9;
+    optional uint32 tx_retries = 10;
+    optional string os_type = 11;
+    optional string user_role = 12;
+    optional uint32 vlan = 13;
+    optional uint32 authtype = 14;
+    optional uint32 authstate = 15;
+}
+
+//VPN Tunnel information
+message VpnTunnelInfo
+{
+    optional uint32 tunnel_index = 1;
+    optional uint32 crypto_type = 2;
+    optional string peer_name = 3;
+    optional IpAddress peer_tunnel_ip = 4;
+    optional IpAddress tunnel_ip = 5;
+    optional uint32 tunnel_status = 6;
+    optional uint32 tunnel_active_status = 7;
+    optional uint32 tunnel_uptime = 8;
+}
+
+//Dynamic blacked clients
+message DynamicBlackedClientsInfo
+{
+    optional MacAddress match_mac = 1;
+    optional string reason = 2;
+    optional uint64 timestamp = 3;
+    optional uint32 remainingtime = 4;
+    optional string ap_name = 5;
+}
+
+//Air Monitor rogue Information
+message AirMonitorRogueInfo
+{
+    enum wms_rap_match_type {
+        RAP_MT_NONE = 0;
+        RAP_MT_CFG_WM = 1;
+        RAP_MT_ETH_WM = 2; 
+        RAP_MT_AP_WM = 3; 
+        RAP_MT_EXT_WM = 4;
+        RAP_MT_MANUAL = 5;
+        RAP_MT_BASE_BSSID = 6;
+        RAP_MT_EMS = 7;
+        RAP_MT_ETH_GW_WM = 8;
+        RAP_MT_CLASS_OFF = 9;
+        RAP_MT_AP_BSSID = 10;
+        RAP_MT_PROP_ETH_WM = 11;
+        RAP_MT_AP_RULE = 12;
+        RAP_MT_SYSTEM_WM = 13;
+        RAP_MT_SYSTEM_GW_WM = 14;
+    }
+
+    enum wms_rap_nat_match_type {
+        RAP_NMT_NONE = 0; 
+        RAP_NMT_EQUAL = 1;
+        RAP_NMT_PLUS_ONE = 2;
+        RAP_NMT_MINUS_ONE = 3;
+        RAP_NMT_OUI = 4;
+    }
+
+    optional wms_rap_match_type match_type = 1;
+    optional MacAddress match_mac = 2;
+    optional IpAddress match_ip = 3;
+    optional string monitor_name = 4;
+    optional wms_rap_nat_match_type nat_match_type = 5;
+}
+
+//Air Monitor Information
+message AirMonitorInfo
+{
+    enum wms_snmp_encr_protocol {
+        WMS_SNMP_WPA_ENCR_OPEN = 0;
+        WMS_SNMP_WPA_ENCR_WEP = 1;
+        WMS_SNMP_WPA_ENCR_WPA = 2;
+        WMS_SNMP_WPA_ENCR_WPA2 = 3;
+    }
+
+    enum wms_snmp_wpa_cipher {
+        WMS_SNMP_WPA_CIPHER_NONE = 0;
+        WMS_SNMP_WPA_CIPHER_WEP40 = 1;
+        WMS_SNMP_WPA_CIPHER_WEP104 = 2;
+        WMS_SNMP_WPA_CIPHER_TKIP = 3;
+        WMS_SNMP_WPA_CIPHER_AESCCMP = 4;
+        WMS_SNMP_WPA_CIPHER_OTHER = 5;
+    }
+
+    enum wms_snmp_wpa_auth_alg {
+        WMS_SNMP_WPA_AUTH_NONE = 0;
+        WMS_SNMP_WPA_AUTH_PSK = 1;
+        WMS_SNMP_WPA_AUTH_8021X = 2;
+        WMS_SNMP_WPA_AUTH_OTHER = 3;
+    }
+
+    optional MacAddress monitor_mac = 1;
+    optional bytes essid = 2;
+    optional uint32 monitor_channel = 3;
+    optional uint32 is_ap = 4;
+    optional uint32 classification_type = 5;
+    optional uint32 phy_type = 6;
+    optional uint32 ht_type = 7;
+    optional MacAddress heard_mac = 8;
+    optional MacAddress bssid = 9;
+    optional wms_snmp_encr_protocol encr_type = 10;
+    optional wms_snmp_wpa_cipher encr_cipher = 11;
+    optional wms_snmp_wpa_auth_alg auth_alg = 12;
+    optional AirMonitorRogueInfo am_rogue = 13;
+}
+
+//Spectrum information
+message SpectrumInfo
+{
+    optional MacAddress ap_mac= 1;
+    optional uint32 radio_number = 2;
+    optional uint32 dev_id = 3;
+    optional uint32 dev_type = 4;
+    optional uint32 low_ch = 5;
+    optional uint32 high_ch = 6;
+    optional uint32 signal = 7;
+    optional uint32 duty_cycle = 8;
+    optional uint32 center_freq = 9;
+    optional uint64 timestamp = 10;
+    optional uint64 active_time = 11;
+}
+
+//Air Monitor Active Laser Beam Information
+message AirMonitorActiveLaserBeamInfo
+{
+    optional MacAddress bssid = 1;
+    optional uint32 channel = 2;
+    optional uint32 rssi = 3;
+    optional string ap_name = 4;
+    optional uint32 lms_ip = 5;
+    optional uint32 master_ip = 6;
+    optional uint64 inactive_time = 7;
+}
+
+//Radio Statistics
+message RadioStat
+{
+    optional MacAddress radio_mac = 1;
+    optional uint64 channel_busy_time = 2;
+    optional uint64 rx_time = 3;
+    optional uint64 tx_time = 4;
+    optional uint64 tx_data_bytes = 6;
+    optional uint64 rx_data_bytes = 7;
+    optional uint64 rx_total = 8;
+    optional uint64 phy_event = 9;
+    optional uint64 rx_bad = 10;
+    repeated RssiInfo rssi = 11; //include clients and monitor rssi value
+    optional uint32 ext_ssid_state = 12; 
+    optional uint32 radio_band = 13;
+    optional string channel = 14;
+    optional uint32 transmit_power = 15;
+    optional uint32 noise_floor = 16;
+    optional uint32 channel_busy_64 = 17;
+    optional uint32 tx_drops = 18;
+}
+
+//VAP Statistics
+message VapStat 
+{
+    optional MacAddress vap_mac = 1;
+    optional uint64 tx_data_bytes = 2;
+    optional uint64 rx_data_bytes = 3;
+}
+
+//Port Statistics
+message PortStat
+{
+    optional MacAddress port_mac = 1;
+    optional uint64 tx_data_bytes = 2;
+    optional uint64 rx_data_bytes = 3;
+}
+
+//Client Statistics
+message ClientStat
+{
+    optional MacAddress client_mac = 1;
+    optional uint64 tx_data_bytes = 2;
+    optional uint64 rx_data_bytes = 3;
+    optional uint64 rx_rate = 4;
+    optional uint64 tx_rate = 5;
+    optional uint64 max_tx_rate = 6;
+    optional uint32 speed = 7;
+    optional uint64 tx_data_bytes_transmitted = 8;
+    optional uint32 tx_time_data = 9;
+    optional uint32 rx_time_data = 10;
+    optional uint32 sta_client_health = 11;
+    optional uint32 snr = 12;
+    optional uint32 rx_retries = 13;
+    optional uint32 tx_retries = 14;
+}
+
+//Tunnel statistics
+message TunnelStat
+{
+    optional uint32 tunnel_index = 1;
+    optional uint64 tx_data_bytes = 2;
+    optional uint64 rx_data_bytes = 3;
+}
+
+//Modem statistics
+message ModemStat
+{
+    optional MacAddress iap_mac = 1;
+    optional uint64 tx_data_bytes = 2;
+    optional uint64 rx_data_bytes = 3;
+}
+
+//Trap Element
+message IapTrapElement
+{
+    required uint32 eid = 1;
+    optional bytes payload = 2;
+}
+
+//Trap Single 
+message IapTrapEntry
+{
+    enum snmp_version_type
+    {   
+       SNMP_V1 = 1;  
+       SNMP_V2C = 2;  
+       SNMP_V3 = 3;  
+    }
+    required snmp_version_type snmp_version = 1;
+    optional uint32 trap_id = 2;
+    optional uint32 trap_age = 3;
+    repeated IapTrapElement trap_element = 4;
+}

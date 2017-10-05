@@ -1,0 +1,132 @@
+//import "nanopb.proto";
+
+package acp.iap;
+option java_package = "com.aruba.acp.device.iap";
+option java_outer_classname = "Iap";
+
+// Common objects
+
+message ip_address {
+        enum addr_family {
+             ADDR_FAMILY_INET = 2;   // Internet IP Protocol
+             ADDR_FAMILY_INET6 = 10; // IP version 6
+        }
+        required addr_family af = 1;
+        required bytes addr = 2;
+}
+
+message mac_address {
+        required bytes addr = 1; 
+}
+
+
+// Main objects
+message rssi {
+        optional mac_address sta_eth_mac = 1;
+        optional mac_address radio_mac = 2;
+        optional uint32 rssi_val = 3;
+        optional uint32 noise_floor = 4;
+        optional bool associated = 5;
+        optional bool is_ap = 6;
+        optional uint32 age = 7;
+}
+
+message station {
+        optional mac_address sta_eth_mac = 1;
+        optional string username = 2;
+        optional string role = 3;
+        optional mac_address bssid = 4;
+        optional string device_type = 5;
+        optional ip_address sta_ip_address = 6;
+}
+
+message access_point {
+        enum deployment_mode {
+             DEPLOYMENT_MODE_CAMPUS = 0;
+             DEPLOYMENT_MODE_REMOTE = 1;
+        }
+        optional mac_address ap_eth_mac = 1;
+        optional string ap_name = 2; 
+        optional string ap_group = 3;
+        optional string ap_model = 4;
+        optional deployment_mode depl_mode = 5;
+        optional ip_address ap_ip_address = 6;
+}
+
+message radio {
+        enum radio_phy_type {
+             RADIO_PHY_TYPE_A = 0;
+             RADIO_PHY_TYPE_A_HT = 1;
+             RADIO_PHY_TYPE_A_HT_40 = 2;
+             RADIO_PHY_TYPE_B_G = 3;
+             RADIO_PHY_TYPE_B_G_HT = 4;
+             RADIO_PHY_TYPE_B_G_HT_40 = 5;
+             RADIO_PHY_TYPE_AC_HT = 6;
+             RADIO_PHY_TYPE_AC_HT_40 = 7;
+             RADIO_PHY_TYPE_AC_HT_80 = 8;
+        }
+        enum radio_mode {
+             RADIO_MODE_AP = 0;
+             RADIO_MODE_MESH_PORTAL = 1; 
+             RADIO_MODE_MESH_POINT = 2;
+             RADIO_MODE_AIR_MONITOR = 3;
+             RADIO_MODE_SPECTRUM_SENSOR = 4;
+        }
+        optional mac_address ap_eth_mac = 1;
+        optional mac_address radio_bssid = 2;
+        optional radio_phy_type phy_type = 3;
+        optional radio_mode mode = 4;
+}
+
+message virtual_access_point {
+        optional mac_address bssid = 1;
+        optional string ssid = 2;
+        optional mac_address radio_bssid = 3;
+}
+message uplink_bandwidth {
+        optional ip_address  server_ip = 1;
+        optional uint32      server_port =2;
+        optional ip_address  local_ip =3;
+        optional uint32      local_port = 4;
+        optional string      timestamp = 5;
+        optional string      protocol = 6;
+        optional uint32      interval = 7;
+        optional uint32      bytes_txferred = 8;
+        optional uint32      bandwidth = 9;
+        optional uint32      total_retries = 10;
+        optional uint32      recv_interval = 11;
+        optional uint32      receive_bytes = 12;
+        optional uint32      recv_bandwidth = 13;
+        optional uint32      recv_retries = 14;
+        optional uint32      jitter = 15;
+        optional uint32      datagrams_sent = 16;
+        optional uint32      datagrams_recd =17;
+}
+
+// Http Post container
+message iap_event {
+        enum operation {
+             OP_ADD = 0;
+             OP_UPDATE = 1;
+             OP_DELETE = 2;
+             OP_SYNC = 3;
+        }
+        optional uint64 seq = 1;
+        optional uint32 timestamp = 2;
+        optional operation op = 3;
+        optional string iap_id = 4; // Unique ID.
+
+        repeated rssi rssi = 101;
+        repeated station station = 102;
+        repeated radio radio = 103;
+        repeated access_point access_point = 104;
+        repeated virtual_access_point virtual_access_point = 105;
+        optional bytes IapAppRF_Data = 106; 
+		optional bytes IapState_Data = 107;
+        optional bytes IapStat_Data = 108;
+		optional bytes uplink_bandwidth = 109;
+}
+
+message iap_post {
+        repeated iap_event iap_event_msg = 1;
+}

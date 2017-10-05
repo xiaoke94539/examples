@@ -1,0 +1,202 @@
+// File : policy.proto
+// Basic V4 or V6 validation has to be taken care by ACP
+// Basic FQDN validation can be done by ACP
+// Other generic options can be validated by ACP
+// All the optional field may not be support in Phase I (capabilities will be added incrementally in future release)
+
+package acp.iap;
+
+option java_package = "com.aruba.acp.device.iap";
+
+/*
+    Topic definition
+    ----------------
+    Service Assurance (SA) policy topics
+    * iap.policy.sareq
+    * iap.policy.saresp
+*/
+
+message PolicyMessage {
+    optional uint32 version = 1;  //version of iap request message                                                                      
+    optional uint64 sequence = 3; // if this message is the response to a central message, then sequence no should match                
+    optional bytes  guid = 4;      // Policy-Id
+    optional string oem_tag = 5;  // X-OEM Tag, currently its Aruba, For 3rd Party - its OEM Bytes.                                     
+} 
+
+message ICMPCommand {
+    required string host = 1;     // can be fqdn or ipv4 or ipv6 
+    optional uint32 count = 2;
+    optional uint32 size_in_bytes = 3;
+    optional uint32 wait_in_second = 4;
+    optional string source_ip = 5;
+    optional string interface_name = 6;
+    optional uint32 ip_tos = 7;
+}
+
+message TCPConnectCommand {
+    required string host = 1;   // can be fqdn or ipv4 or ipv6
+    required uint32 port = 2;
+    optional uint32 timeout = 3;
+}
+
+enum direction_type {
+    DOWNSTREAM = 1;
+    UPSTREAM = 2;
+    BIDIRECTIONAL = 3;
+}
+
+message IperfCommand {
+    required string host = 1; 
+    optional uint32 port = 2;
+    optional direction_type direction = 3;
+    optional string  protocol = 4;
+    optional uint32  interval = 5;
+    optional uint32 bandwidth = 6;
+    optional uint32 parallel = 7;
+    optional uint32 omit_in_seconds = 8;
+    optional uint32 window_size_in_kb = 9;
+    optional string misc_options = 10; 
+}
+
+message WebpageLoadCommand {
+    required string url = 1;  // Full valid URL 
+    optional uint32 timeout = 2;
+    optional string wget_options = 3; 
+}
+
+enum policy_event {
+    POLICY_EVENT_SA_ADD      = 1;
+    POLICY_EVENT_SA_UPDATE   = 2;
+    POLICY_EVENT_SA_DEL      = 3;
+    POLICY_EVENT_SA_ACTIVATE = 4;
+}
+
+enum policy_schedule_type {
+    POLICY_SCHEDULE_ON_DEMAND = 1;
+    POLICY_SCHEDULE_PERIODIC = 2;
+}
+
+message PolicyInfo {
+    optional PolicyMessage        msg_info = 1;
+    optional string               name = 2;
+    optional policy_event         event = 3;
+    optional policy_schedule_type schedule = 4;
+    repeated string               policy_cookie = 5;
+}
+
+message TestSuiteSchedule {
+    optional uint32 frequency = 1;     // no of times to schedule
+    optional uint32 period = 2;        // period = time duration after which to schedule.
+    optional uint64 start_timestamp = 3;
+    optional uint64 end_timestamp = 4;
+}
+
+//REQUEST FORMAT
+//under the message type - WSC_MSG_ATHENA_SA_REQUEST with topic "iap.policy.sareq"
+message ReachabilityReq {
+    optional TestSuiteSchedule  test_schedule = 1;
+    repeated ICMPCommand        test_icmp = 2; 
+}
+
+//under the message type - WSC_MSG_ATHENA_SA_REQUEST with topic "iap.policy.sareq"
+message ConnectivityReq {
+    optional TestSuiteSchedule  test_schedule = 1;
+    repeated TCPConnectCommand  test_tcp = 2; 
+}
+
+//under the message type - WSC_MSG_ATHENA_SA_REQUEST with topic "iap.policy.sareq"
+message PerformanceReq {
+    optional TestSuiteSchedule  test_schedule = 1;
+    repeated WebpageLoadCommand test_webload = 2; 
+    repeated IperfCommand       test_iperf = 3;
+}
+
+message PolicyReq {
+    optional PolicyInfo         info = 1;
+    //Various Test Suites which are part of the policy
+    optional ReachabilityReq    reachability = 2;
+    optional ConnectivityReq    connectivity = 3;
+    optional PerformanceReq     performance = 4;
+}
+
+enum resp_code {
+    RESP_SUCCESS = 1;
+    RESP_NACK = 2;
+    RESP_FAILURE = 3;
+    RESP_INPROGRESS = 4;
+}
+
+message ICMPCommandResp {
+    optional ICMPCommand cmd_req     = 1;
+    required resp_code resp_status   = 2; 
+    optional string resp_info        = 3;  // Last two lines of the ping response will be sent; it can be parsed for further details
+    optional uint32 transmitted_pkts = 4;
+    optional uint32 received_pkts    = 5;
+    optional uint32 rtt_avg          = 6;
+}
+
+message TCPConnectCommandResp {
+    optional TCPConnectCommand cmd_req = 1;
+    required resp_code resp_status     = 2;
+    optional uint32 connect_time       = 3;
+    optional string failure_message    = 4;  // On failure case, connect error string will be sent
+}
+
+message WebpageLoadCommandResp {
+    optional WebpageLoadCommand cmd_req = 1;
+    required resp_code resp_status      = 2;
+    optional string resp_info           = 3;  // include both success & failure message; Last two lines of the wget response will be sent 
+    optional uint64 download_rate       = 4;
+    optional uint64 download_bytes      = 5;
+}
+
+message IperfCommandResp {
+    optional IperfCommand cmd_req = 1;
+    required resp_code    resp_status = 2;
+    required string       failure_message = 3;  // failure response will be sent; this will have the string to be parsed 
+	
+    optional string      host = 4;
+    optional uint32      server_port = 5;
+    optional string      timesecs = 6;
+    optional string      protocol = 7;
+    optional uint32      interval = 8;
+    optional uint32      upstream_bytes = 9;
+    optional uint32      upstream_bandwidth = 10;
+    optional uint32      upstream_retries = 11;
+    optional uint32      downstream_bytes = 12;
+    optional uint32      downstream_bandwidth = 13;
+    optional uint32      downstream_retries = 14;
+    optional uint32      upstream_datagrams = 15;
+    optional uint32      downstream_datagrams = 16;
+    optional string      upstream_jitter = 17;
+    optional string      downstream_jitter = 18;
+    optional uint32      upstream_lost_packets = 19;
+    optional uint32      downstream_lost_packets = 20;
+}
+
+// RESPONSE FORMAT
+//fall under the message type - WSC_MSG_ATHENA_SA_RESPONSE with topic "iap.policy.saresp"
+message ReachabilityResp {
+    repeated ICMPCommandResp test_icmp_resp = 1; 
+}
+
+//fall under the message type - WSC_MSG_ATHENA_SA_RESPONSE with topic "iap.policy.saresp"
+message ConnectivityResp {
+    repeated TCPConnectCommandResp test_tcp_resp = 1; 
+}
+
+//fall under the message type - WSC_MSG_ATHENA_SA_RESPONSE with topic "iap.policy.saresp"
+message PerformanceResp {
+    repeated WebpageLoadCommandResp test_webload_resp = 1; 
+    repeated IperfCommandResp       test_iperf_resp   = 2;
+}
+
+message PolicyResp {
+    optional PolicyInfo          info       = 1;
+    optional resp_code           resp_status = 2; //global policy status - useful in policy level NACK/SUCCESS scenarios  
+    //Various Test Suites which are part of the policy
+    optional ReachabilityResp   reachability = 3;
+    optional ConnectivityResp   connectivity = 4;
+    optional PerformanceResp    performance  = 5;
+}
+
