@@ -21,7 +21,10 @@ import com.aruba.acp.ce.websocketx.http.SharedConnectionInfo;
 import com.aruba.acp.ce.websocketx.relay.RelayVerticle;
 import com.aruba.acp.ce.websocketx.util.EventBusAddress;
 import com.aruba.acp.device.iap.Iap_messages;
+import com.aruba.acp.device.iap.IapPolicy.PerformanceReq;
+import com.aruba.acp.device.iap.IapPolicy.PolicyReq;
 import com.aruba.acp.device.iap.IapPolicy.PolicyResp;
+import com.aruba.acp.device.iap.IapPolicy.WebpageLoadCommand;
 import com.aruba.acp.device.mbus.MBus;
 import com.aruba.acp.device.mbus.MBus.DeviceMessage;
 import com.aruba.acp.rabbitmq.RabbitConfig;
@@ -47,15 +50,15 @@ import io.vertx.core.buffer.Buffer;
 import io.vertx.core.eventbus.DeliveryOptions;
 
 public class RabbitMQProducer {
-	
+
 	private final static Logger LOG = LoggerFactory.getLogger(RelayVerticle.class);
 
 	private RabbitConsumer deviceConsumer;
 	private RabbitSubscription deviceSubscription;
-	
+
 	private RabbitConsumer incomingConsumer;
 	private RabbitSubscription incomingSubscription;
-	
+
 	private String SERIALNO="CT0362347";
 	private int NUM_DEVICES = 2;
 	private int NUM_MESSAGES = 5;
@@ -67,7 +70,7 @@ public class RabbitMQProducer {
 	private RabbitProducer producer;
 	private SharedConnectionInfo connections;
 	private int MSG_SIZE = 1000;
-	
+
 
 	public RabbitMQProducer() {
 		Config c = ConfigFactory.empty();
@@ -90,6 +93,7 @@ public class RabbitMQProducer {
 		Thread thread = new Thread() {
 			public void run() {
 				producer(SERIALNO, "iap.cmd.debug.req");
+				producer(SERIALNO, "iap.policy.sareq");
 			}
 		};
 		thread.start();
@@ -102,42 +106,43 @@ public class RabbitMQProducer {
 		stop();
 	}
 
-	
+
 	public byte[] constructMessage(String topic) {
 		switch (topic) {
 		case "iap.cmd.debug.req":
 			Iap_messages.IapDebugCommand command = Iap_messages.IapDebugCommand.newBuilder().setCmd("ping www.google.com").build();
-			Iap_messages.IapMessageInfo info = Iap_messages.IapMessageInfo.newBuilder().setSequence(1507151065958207L).build();
+			Iap_messages.IapMessageInfo info = Iap_messages.IapMessageInfo.newBuilder().setSequence(1507151065958208L).build();
 			Iap_messages.IapDebugCommandListReq req = Iap_messages.IapDebugCommandListReq.newBuilder().addCommand(command).setInfo(info).build();
 			return req.toByteArray();
-			
-	    default:
-				ByteBuffer eventTypeBuffer = ByteBuffer.allocate(MSG_SIZE);
-				ByteString barray = ByteString.copyFrom(eventTypeBuffer);
-				DeviceMessage builder = DeviceMessage.newBuilder().setTopic(topic).setData(barray).build();
-				return builder.toByteArray();
-			//WebpageLoadCommand command = WebpageLoadCommand.newBuilder().setUrl("http://www.google.com").build();
-			
-			//PerformanceReq req = PerformanceReq.newBuilder().addTestWebload(command).build();
-			//PolicyReq po = PolicyReq.newBuilder().setPerformance(req).build();
+		case "iap.policy.sareq":
+			WebpageLoadCommand c = WebpageLoadCommand.newBuilder().setUrl("http://www.google.com").build();			
+			PerformanceReq r = PerformanceReq.newBuilder().addTestWebload(c).build();
+			PolicyReq po = PolicyReq.newBuilder().setPerformance(r).build();
+			return po.toByteArray();
+		default:
+			ByteBuffer eventTypeBuffer = ByteBuffer.allocate(MSG_SIZE);
+			ByteString barray = ByteString.copyFrom(eventTypeBuffer);
+			DeviceMessage builder = DeviceMessage.newBuilder().setTopic(topic).setData(barray).build();
+			return builder.toByteArray();
+
 		}
 	}
-	
+
 	public void producer(String serialNum, String topic) {	
-		byte[] message = constructMessage(topic);
-		final byte[] m = (message == null) ? (new byte[0]) : (message);
+		final byte[] message = constructMessage(topic);
+
 		try {
 			// Copy all the headers over and add the current time stamp
 			final Map<String, Object> hdrs = new HashMap<String, Object>();
 			hdrs.put(RabbitHeaders.LAST_CONTACT, System.currentTimeMillis());
 			hdrs.put(RabbitHeaders.SERIAL, serialNum);
-			this.producer.publishDeviceMsgToExchange(topic, hdrs, m, false);
+			this.producer.publishDeviceMsgToExchange(topic, hdrs, message, false);
 		} catch (Exception e) {
 			LOG.error("Exception sending data to mq: topic=" + topic + ", serial=" + serialNum, e);
 		}
 	}
 
-	
+
 	public static Connection createRmqConnection(String host, String user, String password) {
 		Connection connection = null;
 		try {
@@ -153,11 +158,11 @@ public class RabbitMQProducer {
 	}
 	public void sendMessage(RabbitMQProducer producer, String topic, final ThreadLocalRandom random) {
 		for (int i = 0; i < NUM_MESSAGES; i++) {
-		int randomNum = random.nextInt(0, NUM_DEVICES);
-		producer.producer(String.valueOf(randomNum), topic);
+			int randomNum = random.nextInt(0, NUM_DEVICES);
+			producer.producer(String.valueOf(randomNum), topic);
 		}
 	}
-	
+
 	public void addBinding(RabbitFactory rabbitFactory) {
 		RabbitConsumer consumer = rabbitFactory.getConsumer(POD_NAME);
 		consumer.addTopicBasedTemplate(RabbitHeaders.SERIAL, SERIALNO);
@@ -165,18 +170,18 @@ public class RabbitMQProducer {
 			consumer.addTopicBasedTemplate(RabbitHeaders.SERIAL, String.valueOf(i));
 		}*/
 	}
-	
+
 	public void createIncomingConsumer() {
 		incomingConsumer = rabbitFactory.createConsumer("veena", POD_NAME);
 		addBinding(rabbitFactory);
 		incomingSubscription = incomingConsumer.subscribe(this::relay, true);		
 	}
-	
+
 	public void createDeviceConsumer() {
 		deviceConsumer = rabbitFactory.createConsumer("recv-decoder-queue");
 		deviceSubscription = deviceConsumer.subscribe(this::relay, true);		
 	}
-	
+
 	public void stop() {
 		System.out.println("Received: " + counter.get());
 		try {
@@ -197,7 +202,7 @@ public class RabbitMQProducer {
 
 	}
 
-	
+
 	protected static String decodeProtobuf(String topic, byte[] messageBody) {
 		try {
 			if (topic.contains("iap")) {
@@ -225,27 +230,27 @@ public class RabbitMQProducer {
 		}
 		return "";
 	}
-	
-	
+
+
 	public void relay(String topic, Map<String, Object> headers, byte[] body) {
-		
+
 		if (body != null) {
 			counter.incrementAndGet();
 			//System.out.println("received time -> " + (System.currentTimeMillis() - Long.parseLong(String.valueOf(headers.get("x-timestamp")))));
 
 			System.out.println("received topic ->" + topic);
-				topic = topic.replace(headers.get(RabbitHeaders.SERIAL) + ".", "");
-			
+			topic = topic.replace(headers.get(RabbitHeaders.SERIAL) + ".", "");
+
 			System.out.println(decodeProtobuf(topic, body));
 			System.out.println("Received: " + counter.get());
 		}
 	}
-	
+
 	/*		Connection connection = createRmqConnection("10.53.14.110", "guest", "guest");
 	Channel chan;
 	try {
 		chan = connection.createChannel();
-	
+
 
 	return chan;
 	} catch (IOException e) {
@@ -253,8 +258,8 @@ public class RabbitMQProducer {
 		e.printStackTrace();
 	}
 	return null;*/
-	
-/*	    Class appClass = RabbitConsumer.class;
+
+	/*	    Class appClass = RabbitConsumer.class;
 
     Class[] parameterTypes = {};
 
@@ -266,23 +271,23 @@ public class RabbitMQProducer {
       Object value = m.get(consumer);
       Channel chan = (Channel) value;
       m = appClass.getDeclaredField("queue");
-      
+
       m.setAccessible(true);
       value = m.get(consumer);
       RabbitQueue queue = (RabbitQueue) value;
-      
+
       m = RabbitQueue.class.getDeclaredField("name");
       m.setAccessible(true);
       String qname = (String)m.get(queue);
       m = RabbitQueue.class.getDeclaredField("exchange");
       m.setAccessible(true);
       String ename = (String)m.get(queue);
-      
+
 		Map<String, Object> bindingArgs = new HashMap<String, Object>();
 	    bindingArgs.put("serial", SERIALNO);
 	    bindingArgs.put("x-match", "any");
 		chan.queueBind(qname, ename, "", bindingArgs);
-		
+
 		bindingArgs = new HashMap<String, Object>();
 	    bindingArgs.put("serial", SERIALNO+"-1");
 	    bindingArgs.put("x-match", "any");
