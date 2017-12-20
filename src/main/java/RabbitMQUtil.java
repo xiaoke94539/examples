@@ -5,6 +5,7 @@ import java.text.SimpleDateFormat;
 import java.util.Calendar;
 import java.util.HashMap;
 import java.util.Map;
+import java.util.UUID;
 import java.util.concurrent.Executors;
 import java.util.concurrent.ThreadLocalRandom;
 import java.util.concurrent.atomic.AtomicInteger;
@@ -16,6 +17,7 @@ import com.aruba.acp.ce.AppConfig;
 import com.aruba.acp.ce.debug.MessageHelper;
 import com.aruba.acp.ce.websocketx.http.SharedConnectionInfo;
 import com.aruba.acp.ce.websocketx.relay.RelayVerticle;
+import com.aruba.acp.ce.websocketx.util.RMQTopicUtil;
 import com.aruba.acp.device.iap.IapPolicy.PerformanceReq;
 import com.aruba.acp.device.iap.IapPolicy.PolicyReq;
 import com.aruba.acp.device.iap.IapPolicy.PolicyResp;
@@ -33,7 +35,7 @@ import com.rabbitmq.client.Connection;
 import com.rabbitmq.client.ConnectionFactory;
 import com.typesafe.config.Config;
 
-public class RabbitMQProducer extends Test {
+public class RabbitMQUtil {
 
 	private final static Logger LOG = LoggerFactory.getLogger(RelayVerticle.class);
 
@@ -56,10 +58,11 @@ public class RabbitMQProducer extends Test {
 	private int MSG_SIZE = 1000;
 
 
-	public RabbitMQProducer() {
-	  super();
-		System.out.println(conf);
-		RabbitConfig rabbitmqConf = new RabbitConfig(conf);
+	public RabbitMQUtil(Config c) {
+
+		System.out.println(c);
+		System.out.println(System.getenv());
+		RabbitConfig rabbitmqConf = new RabbitConfig(c);
 
 		rabbitFactory = new RabbitFactory(rabbitmqConf.getConfig(), this::rmqShutdownHandler, Executors.newFixedThreadPool(2));
 		createDeviceConsumer();
@@ -133,7 +136,7 @@ public class RabbitMQProducer extends Test {
 		}
 		return connection;
 	}
-	public void sendMessage(RabbitMQProducer producer, String topic, final ThreadLocalRandom random) {
+	public void sendMessage(RabbitMQUtil producer, String topic, final ThreadLocalRandom random) {
 		for (int i = 0; i < NUM_MESSAGES; i++) {
 			int randomNum = random.nextInt(0, NUM_DEVICES);
 			producer.producer(String.valueOf(randomNum), topic);
@@ -141,28 +144,31 @@ public class RabbitMQProducer extends Test {
 	}
 
 	public void addBinding(RabbitFactory rabbitFactory) {
-		RabbitConsumer consumer = rabbitFactory.getConsumer(POD_NAME);
-		consumer.addTopicBasedTemplate(RabbitHeaders.SERIAL, SERIALNO);
-		boolean success = false;
-		int MAX_WAIT_SEC = 5;
-		int retry = 1;
-		while ((retry < 3) && (!success)) {
-			int randomNum = ThreadLocalRandom.current().nextInt(1, MAX_WAIT_SEC);
-			System.out.println("Retry: " + retry + ", waiting for: " + randomNum);
-			try {
-				Thread.sleep(randomNum * 1000);
-			}
-			catch (Exception ex) {
-				
-			}
-			retry++;
-			//success = rabbitFactory.getConsumer(AppConfig.POD_NAME).addTopicBasedTemplate(RabbitHeaders.SERIAL, serialNum);
-			if (retry == 2) {success = true;}
-		}
+		//RabbitConsumer consumer = rabbitFactory.getConsumer(POD_NAME);
+		//consumer.addTopicBasedTemplate(RabbitHeaders.SERIAL, SERIALNO);
+		String owner1 = UUID.randomUUID().toString();
+		RMQTopicUtil.getInstance().addTopicBinding(rabbitFactory, SERIALNO, owner1);
+		RMQTopicUtil.getInstance().addTopicBinding(rabbitFactory, SERIALNO, UUID.randomUUID().toString());
 		
 		/*for (int i = 0; i < NUM_DEVICES; i++) {
 			consumer.addTopicBasedTemplate(RabbitHeaders.SERIAL, String.valueOf(i));
 		}*/
+		
+		System.out.println(RMQTopicUtil.getInstance().getCurrentMapAsString());
+		RMQTopicUtil.getInstance().removeTopicBinding(rabbitFactory, "1", owner1);
+		
+		RMQTopicUtil.getInstance().removeTopicBinding(rabbitFactory, SERIALNO, owner1);
+		RMQTopicUtil.getInstance().removeTopicBinding(rabbitFactory, SERIALNO, UUID.randomUUID().toString());
+		System.out.println(RMQTopicUtil.getInstance().getCurrentMapAsString());
+		
+		RMQTopicUtil.getInstance().addTopicBinding(rabbitFactory, "1", "testing1");
+		RMQTopicUtil.getInstance().addTopicBinding(rabbitFactory, "1", "testing");
+		RMQTopicUtil.getInstance().removeTopicBinding(rabbitFactory, "1", "testing");
+		System.out.println(RMQTopicUtil.getInstance().getCurrentMapAsString());
+		RMQTopicUtil.getInstance().removeTopicBinding(rabbitFactory, "1", "testing1");
+		
+		System.out.println(RMQTopicUtil.getInstance().getCurrentMapAsString());
+		
 	}
 
 	public void createIncomingConsumer() {
@@ -196,6 +202,36 @@ public class RabbitMQProducer extends Test {
 
 	}
 
+
+	protected static String decodeProtobuf(String topic, byte[] messageBody) {
+		try {
+			if (topic.contains("iap")) {
+				switch (topic) {
+				case "native.iap.state.sync":
+					return MessageHelper.toPrettyString(Iap_messages.IapState.parseFrom(messageBody));
+				case "native.iap.stat":
+					return MessageHelper.toPrettyString(Iap_messages.IapStat.parseFrom(messageBody));
+				case "iap.apprf":
+					return MessageHelper.toPrettyString(Iap_messages.IapAppRF.parseFrom(messageBody));
+				case "iap.trap":
+					return MessageHelper.toPrettyString(Iap_messages.IapAppRF.parseFrom(messageBody));
+				case "native.iap.policy.saresp":
+					return MessageHelper.toPrettyString(PolicyResp.parseFrom(messageBody));
+				case "iap.cmd.debug.req":
+					return MessageHelper.toPrettyString(Iap_messages.IapDebugCommandListReq.parseFrom(messageBody));
+				case "native.iap.cmd.debug.resp":
+					return MessageHelper.toPrettyString(Iap_messages.IapDebugCommandListResp.parseFrom(messageBody));
+				default:
+					return "Wrong topic or Topic not yet supported!";
+				}
+			}
+		} catch (Exception e) {
+			System.out.println("Error decoding protobuf message - " + topic);
+		}
+		return "";
+	}
+
+
 	public void relay(String topic, Map<String, Object> headers, byte[] body) {
 
 		if (body != null) {
@@ -210,14 +246,6 @@ public class RabbitMQProducer extends Test {
 		}
 	}
 
-	
-	  public static void main(String[] args) {
-
-	    RabbitMQProducer prod = new RabbitMQProducer();
-	    //RabbitMQUtil prod = new RabbitMQUtil(c);
-	    
-
-	  }
 	/*		Connection connection = createRmqConnection("10.53.14.110", "guest", "guest");
 	Channel chan;
 	try {
