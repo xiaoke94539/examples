@@ -53,8 +53,13 @@
 		</dependency>
 		<dependency>
 		  <groupId>org.apache.kafka</groupId>
+		  <artifactId>kafka-clients</artifactId>
+		  <version>1.0.0</version>
+		</dependency>
+		<dependency>
+		  <groupId>org.apache.kafka</groupId>
 		  <artifactId>kafka-streams</artifactId>
-		  <version>0.11.0.1</version>
+		  <version>1.0.0</version>
 		</dependency>
 		<dependency>
 		  <groupId>com.aruba.acp</groupId>
@@ -74,7 +79,7 @@
 		<dependency>
 			<groupId>com.aruba.acp</groupId>
 			<artifactId>acp-common-hazelcast</artifactId>
-			<version>0.0.66.2</version>
+			<version>0.0.104</version>
 		</dependency>
 		<dependency>
 			<groupId>junit</groupId>

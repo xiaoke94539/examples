@@ -16,12 +16,17 @@ import com.aruba.acp.ce.AppConfig;
 import com.aruba.acp.ce.debug.MessageHelper;
 import com.aruba.acp.ce.websocketx.http.SharedConnectionInfo;
 import com.aruba.acp.ce.websocketx.relay.RelayVerticle;
+import com.aruba.acp.proto.Schema.ip_address;
 import com.aruba.acp.device.iap.IapPolicy.PerformanceReq;
 import com.aruba.acp.device.iap.IapPolicy.PolicyReq;
 import com.aruba.acp.device.iap.IapPolicy.PolicyResp;
 import com.aruba.acp.device.iap.IapPolicy.WebpageLoadCommand;
 import com.aruba.acp.device.iap.Iap_messages;
 import com.aruba.acp.device.mbus.MBus.DeviceMessage;
+import com.aruba.acp.proto.Schema.acp_event;
+import com.aruba.acp.proto.Schema.wireless_controller;
+import com.aruba.acp.proto.Schema.acp_event.event_operation;
+import com.aruba.acp.proto.Schema.acp_event.source_device_type;
 import com.aruba.acp.rabbitmq.RabbitConfig;
 import com.aruba.acp.rabbitmq.RabbitConsumer;
 import com.aruba.acp.rabbitmq.RabbitFactory;
@@ -62,15 +67,28 @@ public class RabbitMQProducer extends Test {
 		RabbitConfig rabbitmqConf = new RabbitConfig(conf);
 
 		rabbitFactory = new RabbitFactory(rabbitmqConf.getConfig(), this::rmqShutdownHandler, Executors.newFixedThreadPool(2));
-		createDeviceConsumer();
+		//createDeviceConsumer();
 		createIncomingConsumer();
 
+		//addBinding(rabbitFactory);
 		producer = rabbitFactory.createProducer("acp-ws-relay-exchange");
+		//producer = rabbitFactory.createProducer("acp-recv-decoder-ce");
 
 		Thread thread = new Thread() {
 			public void run() {
 				producer(SERIALNO, "iap.cmd.debug.req");
 				producer(SERIALNO, "iap.policy.sareq");
+/*			  try {
+			  final byte[] message = constructMessage("forward.cc.clustercontrollermap.resp");
+			  Map<String, Object >headers = new HashMap<String, Object>();
+			  headers.put(RabbitHeaders.SERIAL, "B114947");
+			  headers.put(RabbitHeaders.CLUSTER_ID, "airwave");
+			  headers.put(RabbitHeaders.CUSTOMER_ID, "128002793");
+			  LOG.debug(MessageHelper.toPrettyString(acp_event.parseFrom(message)));
+			  producer.publishToExchange("forward.cc.clustercontrollermap.resp", headers, message, false);
+			  //producer.producer(message, "forward.cc.clustercontrollermap.resp");
+			  }
+			  catch (Exception ex) {} */
 			}
 		};
 		thread.start();
@@ -96,6 +114,23 @@ public class RabbitMQProducer extends Test {
 			PerformanceReq r = PerformanceReq.newBuilder().addTestWebload(c).build();
 			PolicyReq po = PolicyReq.newBuilder().setPerformance(r).build();
 			return po.toByteArray();
+		case "forward.cc.clustercontrollermap.resp":
+		  String ip = "192.168.2.183"; // 10.29.15.10
+		  ip_address.Builder ip_builder = ip_address.newBuilder().setAddr(ipToByteString(ip)).setAf(ip_address.addr_family.ADDR_FAMILY_INET);
+		    wireless_controller.Builder wc = wireless_controller.newBuilder()
+		    .setSerialNumber("B114947")
+		    .setUsername("admin")
+		    .setPassword("aruba123")
+		    .setControllerIpAddress(ip_builder);
+		    acp_event.Builder evt = acp_event.newBuilder().setTenantId("128002793").setOp(event_operation.OP_ADD)
+		        .setSourceDevice(source_device_type.CONTROLLER).setSourceIp(ip)
+		        .setWirelessController(wc)
+		        .setProcessedTimestamp(System.currentTimeMillis());
+		    for (int i = 0; i < ip_builder.getAddr().size(); i++) {
+		      LOG.debug("" + ip_builder.getAddr().byteAt(i));
+		    }
+		    LOG.debug(MessageHelper.toPrettyString(ip_builder));
+		    return evt.build().toByteArray();
 		default:
 			ByteBuffer eventTypeBuffer = ByteBuffer.allocate(MSG_SIZE);
 			ByteString barray = ByteString.copyFrom(eventTypeBuffer);
@@ -142,6 +177,7 @@ public class RabbitMQProducer extends Test {
 
 	public void addBinding(RabbitFactory rabbitFactory) {
 		RabbitConsumer consumer = rabbitFactory.getConsumer(POD_NAME);
+	  //RabbitConsumer consumer = rabbitFactory.createConsumer("veena", POD_NAME, true);
 		consumer.addTopicBasedTemplate(RabbitHeaders.SERIAL, SERIALNO);
 		boolean success = false;
 		int MAX_WAIT_SEC = 5;
@@ -167,7 +203,7 @@ public class RabbitMQProducer extends Test {
 
 	public void createIncomingConsumer() {
 		incomingConsumer = rabbitFactory.createConsumer("veena", POD_NAME, true);
-		addBinding(rabbitFactory);
+		
 		incomingSubscription = incomingConsumer.subscribe(this::relay, true);		
 	}
 

@@ -12,6 +12,7 @@ import com.aruba.acp.ce.AppConfig;
 import com.aruba.acp.ce.debug.MessageHelper;
 import com.aruba.acp.device.iap.Iap_messages;
 import com.aruba.acp.device.iap.IapPolicy.PolicyResp;
+import com.aruba.acp.device.iap.IapPolicy.WebpageLoadCommand;
 import com.typesafe.config.Config;
 import com.typesafe.config.ConfigFactory;
 import com.typesafe.config.ConfigParseOptions;
@@ -21,6 +22,7 @@ import ch.qos.logback.classic.Level;
 import ch.qos.logback.classic.LoggerContext;
 import io.vertx.core.json.JsonObject;
 import com.aruba.acp.proto.Schema.acp_event;
+import com.google.protobuf.ByteString;
 
 public abstract class Test {
 
@@ -56,8 +58,11 @@ public abstract class Test {
           return MessageHelper.toPrettyString(Iap_messages.IapDebugCommandListReq.parseFrom(messageBody));
         case "native.iap.cmd.debug.resp":
           return MessageHelper.toPrettyString(Iap_messages.IapDebugCommandListResp.parseFrom(messageBody));
-        case "station_stats":
+        case "iap.policy.sareq":
+          return MessageHelper.toPrettyString(WebpageLoadCommand.parseFrom(messageBody));
+        case "state":
         case "aggregated.mc.state.ap":
+        case "aggregated.mc.state.station":
           return MessageHelper.toPrettyString(acp_event.parseFrom(messageBody));
         
           
@@ -85,4 +90,15 @@ public abstract class Test {
       System.err.println("Exception changing log level of " + baseLoggerName);
     }
   }
+  
+  public static ByteString ipToByteString(String ipAddress) {
+    String[] ipAddressParts = ipAddress.split("\\.");
+
+    byte[] ipAddressBytes = new byte[4];
+    for(int i=0; i<4; i++){
+        Integer integer = Integer.parseInt(ipAddressParts[i]);
+        ipAddressBytes[i] = integer.byteValue();
+    }
+    return ByteString.copyFrom(ipAddressBytes);
+}
 }
