@@ -40,15 +40,17 @@ import com.aruba.acp.rabbitmq.RabbitProducer;
 import com.aruba.acp.rabbitmq.RabbitPropertyNames;
 import com.aruba.acp.rabbitmq.RabbitSubscription;
 import com.google.protobuf.ByteString;
+import com.rabbitmq.client.AMQP;
+import com.rabbitmq.client.Channel;
 import com.rabbitmq.client.Connection;
 import com.rabbitmq.client.ConnectionFactory;
 import com.rabbitmq.client.impl.nio.NioParams;
 import com.typesafe.config.Config;
 import com.rabbitmq.client.impl.nio.WriteRequest;
 
-public class RabbitMQProducer extends Test {
+public class RabbitRawProducer extends Test {
 
-  private final static Logger LOG = LoggerFactory.getLogger(RelayVerticle.class);
+  private final static Logger LOG = LoggerFactory.getLogger(RabbitRawProducer.class);
 
   private RabbitConsumer deviceConsumer;
   private RabbitSubscription deviceSubscription;
@@ -59,7 +61,7 @@ public class RabbitMQProducer extends Test {
 
   private String SERIALNO="CT0362347";
   private int NUM_DEVICES = 50;
-  private int NUM_MESSAGES = 500000;
+  private int NUM_MESSAGES = 5000000;
   private static final int SUMMARISE_EVERY = 1000;
 
   private String POD_NAME="testingdelete";//new SimpleDateFormat("MMdd_HHmm").format(Calendar.getInstance().getTime());
@@ -71,40 +73,50 @@ public class RabbitMQProducer extends Test {
   
 
 
-  public RabbitMQProducer() {
+  public RabbitRawProducer() {
     super();
     LOG.debug(conf.toString());
     RabbitConfig rabbitmqConf = new RabbitConfig(conf);
     final NioParams nioParams = new NioParams();
 
     nioParams.setWriteQueueCapacity(10000);
-    //nioParams.setWriteEnqueuingTimeoutInMs(10);
+    //nioParams.setWriteEnqueuingTimeoutInMs(1000);
     final BlockingQueue<WriteRequest> writeQueue = new ArrayBlockingQueue<WriteRequest>(nioParams.getWriteQueueCapacity(), true);
     nioParams.setWriteQueue(writeQueue);
 
     LOG.debug(rabbitmqConf.getConfig().getStringList(RabbitPropertyNames.RABBITMQ_SERVER_HOSTS).toString());
-    rabbitFactory = new RabbitFactory(rabbitmqConf.getConfig(), this::rmqShutdownHandler, Executors.newFixedThreadPool(2), nioParams);
-    //createDeviceConsumer();
 
-    //createIncomingConsumer();
+    String uri = "amqp://guest:guest@15.184.9.176:5672";
+    try {
+    ConnectionFactory cfconn = new ConnectionFactory();
+    cfconn.setUri(uri);
+    //cfconn.setSharedExecutor(Executors.newFixedThreadPool(2));
+    cfconn.useNio();
+    
+    /*cfconn.setAutomaticRecoveryEnabled(true);
+    cfconn.setTopologyRecoveryEnabled(true);
+    cfconn.setConnectionTimeout(10_000);
+    cfconn.setNetworkRecoveryInterval(2_000);
+    cfconn.setShutdownTimeout(10_000);
+    cfconn.setRequestedHeartbeat(60);
+    cfconn.setChannelRpcTimeout(90_000); */
+    cfconn.setNioParams(nioParams);
+    
+    final Connection conn = cfconn.newConnection();
 
-    //addBinding(rabbitFactory);
-    //producer = rabbitFactory.createProducer("acp-ws-relay-exchange");
-    //producer = rabbitFactory.createProducer("acp-recv-decoder-ce");
+    
     final int NUM_PRODUCERS = 2;
-
+    String exchange = "acp-recv-decoder-ce";
+    
     ExecutorService executor = Executors.newFixedThreadPool(NUM_PRODUCERS);
     for (int i = 0; i < NUM_PRODUCERS; i++) {
       executor.submit(new Runnable() {
-    
       public void run() {
+        try {
+        Channel ch = conn.createChannel();
         ThreadLocalRandom random = ThreadLocalRandom.current();
         final byte[] message = constructMessage("iap.cmd.debug.req");
-        LOG.debug("Message size: " + message.length);
-        List<RabbitProducer>  producers = new ArrayList<RabbitProducer>();
-        for (int i = 0; i < NUM_PRODUCERS; i++) {
-          producers.add(rabbitFactory.createProducer("acp-recv-decoder-ce"));
-        }
+
         final Map<String, Object> hdrs = new HashMap<String, Object>();
         hdrs.put(RabbitHeaders.LAST_CONTACT, System.currentTimeMillis());
         long start = System.currentTimeMillis();
@@ -116,64 +128,38 @@ public class RabbitMQProducer extends Test {
         //for (int i = 0; i < NUM_MESSAGES; i++) {
         while (true) {
           int randomNum = random.nextInt(0, NUM_DEVICES);
-          try {
             hdrs.put(RabbitHeaders.SERIAL, String.valueOf(randomNum));
             //rabbitFactory.getNIOWriteQueue();
             //int mod = i % NUM_PRODUCERS;
-            RabbitProducer producer = producers.get(0);//producers.get(mod);
-            /*if (rabbitFactory.getNIOWriteQueue() != null && rabbitFactory.getNIOWriteQueue().size() > (nioParams.getWriteQueueCapacity() * 0.7)) {
-              LOG.debug("Queue size: " + writeQueue.size());
-              //try {Thread.sleep(500); } catch (Exception ex) {}
+            final AMQP.BasicProperties props = new AMQP.BasicProperties.Builder().priority(0)
+                .contentType("application/octet-stream")
+                .headers(hdrs)
+                .deliveryMode(1).build();
+            ch.basicPublish(exchange, hdrs.get(RabbitHeaders.SERIAL) + "iap.cmd.debug.req", props, message);
+            //LOG.debug(Thread.currentThread().getName() + " published: " + allTimeCount + " queue size: " + writeQueue.size());
+            allTimeCount ++;
+            thisTimeCount ++;
+            long now = System.currentTimeMillis();
+            if (now > nextSummaryTime) {
+                int thisTimeRate = (int)(1.0 * thisTimeCount / (now - nextSummaryTime + SUMMARISE_EVERY) * SUMMARISE_EVERY);
+                int allTimeRate = (int)(1.0 * allTimeCount / (now - startTime) * SUMMARISE_EVERY);
+                LOG.info(thisTimeRate + " / sec currently, " + allTimeRate + " / sec average");
+                thisTimeCount = 0;
+                nextSummaryTime = now + SUMMARISE_EVERY;
             }
-            else {
-              */
-              //LOG.debug("Before publish size: " + writeQueue.size());
-              producer.publishDeviceMsgToExchange("iap.cmd.debug.req", hdrs, message, false);
-              allTimeCount ++;
-              thisTimeCount ++;
-              long now = System.currentTimeMillis();
-              if (now > nextSummaryTime) {
-                  int thisTimeRate = (int)(1.0 * thisTimeCount / (now - nextSummaryTime + SUMMARISE_EVERY) * SUMMARISE_EVERY);
-                  int allTimeRate = (int)(1.0 * allTimeCount / (now - startTime) * SUMMARISE_EVERY);
-                  LOG.info(thisTimeRate + " / sec currently, " + allTimeRate + " / sec average");
-                  thisTimeCount = 0;
-                  nextSummaryTime = now + SUMMARISE_EVERY;
-              }
+            
               
-              //LOG.debug("published: " + allTimeCount + " queue size: " + writeQueue.size());
-            //}
-          }
+        }
+        }
           catch (Exception ex) {
             LOG.error("Exception: " + ex);
-             try {
-               producers.get(0).close();
-               
-             }
-             catch (Exception e) {}
+            try {
+              conn.close();
+            }
+            catch (Exception e) {}
             System.exit(1);
           }
-        }
-        //LOG.debug("Completed in: " + (System.currentTimeMillis() - start));
-        //LOG.debug("Published: " + published + " queue size: " + writeQueue.size());
-        //long start2 = System.currentTimeMillis();
-/*        while (writeQueue.size() > 0) {
-          try {Thread.sleep(50); } catch (Exception ex) {}
-        } */
-        //LOG.debug("Queue drained in: " + (System.currentTimeMillis() - start2));
-        //LOG.debug("Completed and drained: " + (System.currentTimeMillis() - start));
-        //				producer(SERIALNO, "iap.cmd.debug.req");
-        //				producer(SERIALNO, "iap.policy.sareq");
-        /*			  try {
-			  final byte[] boot = constructMessage("forward.cc.clustercontrollermap.resp");
-			  Map<String, Object >headers = new HashMap<String, Object>();
-			  headers.put(RabbitHeaders.SERIAL, "B114947");
-			  headers.put(RabbitHeaders.CLUSTER_ID, "airwave");
-			  headers.put(RabbitHeaders.CUSTOMER_ID, "128002793");
-			  LOG.debug(MessageHelper.toPrettyString(acp_event.parseFrom(boot)));
-			  producer.publishToExchange("forward.cc.clustercontrollermap.resp", headers, boot, false);
-			  }
-			  catch (Exception ex) {} 
-         */
+        
       }
       });
     };
@@ -185,6 +171,11 @@ public class RabbitMQProducer extends Test {
       e.printStackTrace();
     }
     stop();
+    }
+    catch (Exception ex) {
+      LOG.error("Failed: " + ex);
+      System.exit(1);
+    }
   }
 
 
@@ -254,7 +245,7 @@ public class RabbitMQProducer extends Test {
     }
     return connection;
   }
-  public void sendMessage(RabbitMQProducer producer, String topic, final ThreadLocalRandom random) {
+  public void sendMessage(RabbitRawProducer producer, String topic, final ThreadLocalRandom random) {
     for (int i = 0; i < NUM_MESSAGES; i++) {
       int randomNum = random.nextInt(0, NUM_DEVICES);
       producer.producer(String.valueOf(randomNum), topic);
@@ -335,7 +326,7 @@ public class RabbitMQProducer extends Test {
 
   public static void main(String[] args) {
 
-    RabbitMQProducer prod = new RabbitMQProducer();
+    RabbitRawProducer prod = new RabbitRawProducer();
     //RabbitMQUtil prod = new RabbitMQUtil(c);
 
 

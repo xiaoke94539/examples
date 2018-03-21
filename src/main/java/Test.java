@@ -63,11 +63,10 @@ public abstract class Test {
         case "state":
         case "aggregated.mc.state.ap":
         case "aggregated.mc.state.station":
+        case "ce.state":
           return MessageHelper.toPrettyString(acp_event.parseFrom(messageBody));
-        
-          
         default:
-          return "Wrong topic or Topic not yet supported!";
+          return "Wrong topic: " + topic + " not yet supported!";
       }
     } catch (Exception e) {
       System.out.println("Error decoding protobuf message - " + topic);

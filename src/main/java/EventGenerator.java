@@ -18,6 +18,7 @@ import org.apache.kafka.streams.kstream.KTable;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import com.aruba.acp.common.utils.config.ConfigReader;
+import com.aruba.acp.common.utils.message.MacUtils;
 import com.aruba.acp.proto.Schema;
 import com.aruba.acp.proto.Schema.access_point;
 import com.aruba.acp.proto.Schema.acp_event;
@@ -87,6 +88,7 @@ public class EventGenerator extends Test {
   List<String> apSerials = Arrays.asList("40539236818042",
       "163501080062262",
       "none_existing",
+      "veenaAP1",
       "238352578933286");
   
   // Controller serial number: 94:b4:0f:cc:29:36
@@ -111,13 +113,18 @@ public class EventGenerator extends Test {
 
     producer = new KafkaProducer<String, byte[]>(confReader.getListAsMap("acp.kafka.list").get(0));
     
-//    requestAPController(WC_CONTROLLER_SERIAL, apSerials, BOOTSTRAP_STATION_TOPIC);
-    stationUpdate("238352578933286", ByteString.copyFrom(new byte[]{(byte) 0xd8, (byte)0xc7, (byte)0xc8, (byte)0x47, (byte)0x22, (byte)0x63}));
+    //apUpdate();
+    //radioUpdate();
+    //vapUpdate();
+    
+    
+    //stationUpdate("238352578933286", ByteString.copyFrom(new byte[]{(byte) 0xd8, (byte)0xc7, (byte)0xc8, (byte)0x47, (byte)0x22, (byte)0x63}));
 
-    requestAPController(WC_CONTROLLER_SERIAL, apSerials, BOOTSTRAP_CONTROLLER_TOPIC);
+    //requestAPController(WC_CONTROLLER_SERIAL, apSerials, BOOTSTRAP_CONTROLLER_TOPIC);
+    requestAPController(WC_CONTROLLER_SERIAL, apSerials, BOOTSTRAP_STATION_TOPIC);
+    requestAPController(WC_CONTROLLER_SERIAL);
+    
 
-//    radioUpdate();
-//    apUpdate();
     
 //    radioDelete();
 //    vapUpdate();
@@ -155,6 +162,12 @@ public class EventGenerator extends Test {
   }
 
   
+  public void requestAllController(String wcSerilaNumber, String topic) {
+    wireless_controller.Builder wc = getWirelessController(wcSerilaNumber);
+    acp_event.Builder evt = getACPEvent(event_operation.OP_ADD, "127.0.0.1").setWirelessController(wc);
+    publish(topic, "ALL", evt.build().toByteArray());
+  }
+  
   public void requestAPController(String wcSerialNumber, List<String> apSerialNumbers, String topic) {
     wireless_controller.Builder wc = getWirelessController(wcSerialNumber);
     for (String ap : apSerialNumbers) {
@@ -171,53 +184,58 @@ public class EventGenerator extends Test {
   
   public void apUpdate() {
     System.out.println("Start producing");
-    acp_event.Builder evt = getACPEvent(event_operation.OP_ADD, "127.0.0.1").setAccessPoint(getAP(apMac, "127.0.3.4", "veenaAP"));
-    publish(CE_TOPIC, apMac.toString(), evt.build().toByteArray());
+    acp_event.Builder evt = getACPEvent(event_operation.OP_ADD, "127.0.0.1").setAccessPoint(getAP(apMac, "127.0.3.4"));
+    publish(CE_TOPIC, MacUtils.macAsString(apMac), evt.build().toByteArray());
+    evt.setOp(event_operation.OP_UPDATE).setAccessPoint(getAP(apMac, "127.0.3.4"));
+    publish(CE_TOPIC, MacUtils.macAsString(apMac), evt.build().toByteArray());
+
+    evt = getACPEvent(event_operation.OP_ADD, "127.0.0.1").setAccessPoint(getAP(apMac, "127.0.3.4", "veenaAP"));
+    publish(CE_TOPIC, "3", evt.build().toByteArray());
     evt.setOp(event_operation.OP_UPDATE).setAccessPoint(getAP(apMac, "127.0.3.4", "veenaAP1"));
-    publish(CE_TOPIC, apMac.toString(), evt.build().toByteArray());
+    publish(CE_TOPIC, "8", evt.build().toByteArray());
     
     }
   
   public void radioUpdate() {
     System.out.println("Start producing");
     acp_event.Builder evt = getACPEvent(event_operation.OP_ADD, "127.0.0.1").setRadio(getRadio(apMac, radioMac, 1));
-    publish(CE_TOPIC, apMac.toString(), evt.build().toByteArray());
+    publish(CE_TOPIC, MacUtils.macAsString(apMac), evt.build().toByteArray());
     
     evt.setOp(event_operation.OP_UPDATE).setRadio(getRadio(apMac, radioMac, 2));
-    publish(CE_TOPIC, apMac.toString(), evt.build().toByteArray());
+    publish(CE_TOPIC, MacUtils.macAsString(apMac), evt.build().toByteArray());
     
     evt.setOp(event_operation.OP_UPDATE).setRadio(getRadio(apMac, radioMac1, 2));
-    publish(CE_TOPIC, apMac.toString(), evt.build().toByteArray());
+    publish(CE_TOPIC, MacUtils.macAsString(apMac), evt.build().toByteArray());
     }
 
   public void radioDelete() {
     System.out.println("Start producing");
 
     acp_event.Builder evt = getACPEvent(event_operation.OP_ADD, "127.0.0.1").setRadio(getRadio(apMac, radioMac, 1));
-    publish(CE_TOPIC, apMac.toString(), evt.build().toByteArray());
+    publish(CE_TOPIC, MacUtils.macAsString(apMac), evt.build().toByteArray());
     
     evt.setOp(event_operation.OP_DELETE).setRadio(getRadio(apMac, radioMac, 2));
-    publish(CE_TOPIC, apMac.toString(), evt.build().toByteArray());
+    publish(CE_TOPIC, MacUtils.macAsString(apMac), evt.build().toByteArray());
     }
   
   public void vapUpdate() {
     System.out.println("Start producing");
 
     acp_event.Builder evt = getACPEvent(event_operation.OP_ADD, "127.0.0.1").setVirtualAccessPoint(getVAP(apMac, vapMac, radioMac, "1"));
-    publish(CE_TOPIC, apMac.toString(), evt.build().toByteArray());
+    publish(CE_TOPIC, MacUtils.macAsString(apMac), evt.build().toByteArray());
     
     evt.setOp(event_operation.OP_UPDATE).setVirtualAccessPoint(getVAP(apMac, vapMac, radioMac, "2"));
-    publish(CE_TOPIC, apMac.toString(), evt.build().toByteArray());
+    publish(CE_TOPIC, MacUtils.macAsString(apMac), evt.build().toByteArray());
     }
 
   public void vapDelete() {
     System.out.println("Start producing");
 
     acp_event.Builder evt = getACPEvent(event_operation.OP_ADD, "127.0.0.1").setVirtualAccessPoint(getVAP(apMac, vapMac, radioMac, "1"));
-    publish(CE_TOPIC, apMac.toString(), evt.build().toByteArray());
+    publish(CE_TOPIC, MacUtils.macAsString(apMac), evt.build().toByteArray());
     
     evt.setOp(event_operation.OP_DELETE).setVirtualAccessPoint(getVAP(apMac, vapMac, radioMac, "2"));
-    publish(CE_TOPIC, apMac.toString(), evt.build().toByteArray());
+    publish(CE_TOPIC, MacUtils.macAsString(apMac), evt.build().toByteArray());
     }  
   
  
@@ -238,22 +256,25 @@ public class EventGenerator extends Test {
     return wireless_controller.newBuilder().setSerialNumber(serialNumber);
   }
   
-  public static access_point.Builder getAP(ByteString mac, String ip, String name) {
-    return access_point.newBuilder().setApEthMac(mac_address.newBuilder().setAddr(mac)).setApName(name).setSerialNumber(name)
+  public static access_point.Builder getAP(ByteString mac, String ip ) {
+      return getAP(mac, ip, MacUtils.macAsString(mac));
+  }
+  public static access_point.Builder getAP(ByteString mac, String ip, String serialNum) {
+      return access_point.newBuilder().setApEthMac(mac_address.newBuilder().setAddr(mac)).setApName(serialNum).setSerialNumber(serialNum)
     .setApIpAddress(ip_address.newBuilder().setAddr(ByteString.copyFromUtf8(ip))).setApModel("215");
   }
   
   
   public static virtual_access_point.Builder getVAP(ByteString apMac, ByteString vapMac, ByteString radioMac, String name) {
     return virtual_access_point.newBuilder().setApEthMac(mac_address.newBuilder().setAddr(apMac))
-        .setBssid(mac_address.newBuilder().setAddr(vapMac))
+        .setBssid(mac_address.newBuilder().setAddr(vapMac)).setApSerialNumber(MacUtils.macAsString(apMac))
         .setSsid(name).setRadioBssid(mac_address.newBuilder().setAddr(radioMac));
   }
   
   
   public static radio.Builder getRadio(ByteString apMac, ByteString radioMac, long name) {
     return radio.newBuilder().setApEthMac(mac_address.newBuilder().setAddr(apMac))
-        .setTimestamp(name)
+        .setTimestamp(name).setApSerialNumber(MacUtils.macAsString(apMac))
         .setRadioBssid(mac_address.newBuilder().setAddr(radioMac));
   }
   

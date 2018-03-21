@@ -43,7 +43,7 @@ import org.apache.kafka.clients.consumer.ConsumerConfig;
 public class KProducer extends Test {
   private static final Logger LOG = LoggerFactory.getLogger(KProducer.class);
 
-  public static int NUM_MESSAGES = 200;
+  public static int NUM_MESSAGES = 20;
   public static int BATCH_SIZE = 2;
   public static int NUM_CONSUMER = 1;
   DateTimeFormatter dateFormat = DateTimeFormatter.ofPattern("yyyy/MM/dd HH:mm:ss");
@@ -52,7 +52,8 @@ public class KProducer extends Test {
   KafkaConsumer<String, byte[]> consumer = null;
   KafkaProducer<String, byte[]> producer = null;
 
-  private static String TOPIC = "aggregated_station";
+  private static String DEV = "dev.";
+  private static String TOPIC = "streams-plaintext-input"; //DEV + "ce.state";
   ConfigReader confReader = null;
   private ExecutorService executor;
 
@@ -68,7 +69,8 @@ public class KProducer extends Test {
 
     producer = new KafkaProducer<String, byte[]>(confReader.getListAsMap("acp.kafka.list").get(0));
     //streamProducer(producer, 1);
-//    simpleProducer(producer);
+    simpleProducer(producer, TOPIC);
+    simpleProducer(producer, TOPIC + "1");
     //streamConsumer();
 
     executor = Executors.newFixedThreadPool(NUM_CONSUMER);
@@ -77,7 +79,7 @@ public class KProducer extends Test {
     System.out.println("Finished producing");
 
     //     for (final KafkaStream stream : streams) {
-    for (int i = 0; i < NUM_CONSUMER; i++) {
+/*    for (int i = 0; i < NUM_CONSUMER; i++) {
       final int threadNumber = i;
       executor.submit(new Runnable() {
         public void run() {
@@ -86,40 +88,9 @@ public class KProducer extends Test {
         }
       });
 
-    }
+    } */
   }
 
-  public void streamConsumer() {
-    Properties props = new Properties();
-    props.put(StreamsConfig.APPLICATION_ID_CONFIG, "streams-wordcount");
-    props.put(StreamsConfig.BOOTSTRAP_SERVERS_CONFIG, "10.1.4.46:9092");
-    props.put(StreamsConfig.CACHE_MAX_BYTES_BUFFERING_CONFIG, 0);
-    props.put(StreamsConfig.DEFAULT_KEY_SERDE_CLASS_CONFIG, Serdes.String().getClass().getName());
-    props.put(StreamsConfig.DEFAULT_VALUE_SERDE_CLASS_CONFIG, Serdes.String().getClass().getName());
-
-    // setting offset reset to earliest so that we can re-run the demo code with the same pre-loaded data
-    // Note: To re-run the demo, you need to use the offset reset tool:
-    // https://cwiki.apache.org/confluence/display/KAFKA/Kafka+Streams+Application+Reset+Tool
-    props.put(ConsumerConfig.AUTO_OFFSET_RESET_CONFIG, "earliest");
-
-
-    KStreamBuilder builder = new KStreamBuilder();
-
-
-    KStream<String, String> source = builder.stream(TOPIC);
-
-    KafkaStreams streams = new KafkaStreams(builder, props);//new KafkaStreams(builder, new StreamsConfig(confReader.getListAsMap("acp.kafka.stream").get(0)));
-    streams.start();
-
-    Runtime.getRuntime().addShutdownHook(new Thread(streams::close));
-
-    executor = Executors.newFixedThreadPool(NUM_CONSUMER);
-
-    // Create ConsumerLogic objects and bind them to threads
-
-    streamConsumer(1, source);
-
-  }
 
   public void createTopic(String topic, ConfigReader confReader) {
     AdminClient admin = AdminClient.create(confReader.getListAsMap("acp.kafka.stream").get(0));
@@ -146,16 +117,22 @@ public class KProducer extends Test {
     }
   }
 
-  public void simpleProducer(KafkaProducer<String, byte[]> producer) {
+  public void simpleProducer(KafkaProducer<String, byte[]> producer, String topic) {
     System.out.println("Start producing");
     for (int i = 0; i < NUM_MESSAGES; i++) {
-      ProducerRecord data = new ProducerRecord<String, byte[]>(TOPIC, String.valueOf(i), ("Hello this is record " + i + " " + dateFormat.format(LocalDateTime.now())).getBytes());
-      System.out.println(i);
+      ProducerRecord data = new ProducerRecord<String, byte[]>(topic, String.valueOf(i), (topic + " Hello this is record " + i + " " + dateFormat.format(LocalDateTime.now())).getBytes());
+      System.out.println(i + ":"  +  topic + " Hello this is record " + i + " " + dateFormat.format(LocalDateTime.now()));
+      try {
+        Thread.sleep(1000);
+      }
+      catch (Exception ex) {
+        
+      }
       Future<RecordMetadata> recordMetadata = producer.send(data, new Callback() {
         public void onCompletion(RecordMetadata metadata, Exception e) {
           if(e != null)
             e.printStackTrace();
-          System.out.println("The offset of the record we just sent is: " + metadata);
+          //System.out.println("The offset of the record we just sent is: " + metadata);
         }
       });
     }
